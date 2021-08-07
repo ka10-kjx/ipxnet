@@ -32,6 +32,7 @@ Bit8u inBuffer[IPXBUFFERSIZE];
 IPaddress ipconn[SOCKETTABLESIZE];  // Active TCP/IP connection 
 UDPsocket tcpconn[SOCKETTABLESIZE];  // Active TCP/IP connections
 SDLNet_SocketSet serverSocketSet;
+SDLNet_SocketSet ipxSocketSet;
 
 void UnpackIP(PackedIP ipPack, IPaddress * ipAddr) {
   ipAddr->host = ipPack.host;
@@ -152,6 +153,12 @@ void IPX_ServerLoop() {
   inPacket.data = &inBuffer[0];
   inPacket.maxlen = IPXBUFFERSIZE;
 
+  // Wait for data to arrive or SOCKET_ACTIVITY_TIMEOUT milliseconds,
+  // whichever one comes first. This avoids a busy-wait, as SDLNet_UDP_Recv()
+  // calls select() with a timeout of 0.
+  result = SDLNet_CheckSockets(ipxSocketSet, SOCKET_ACTIVITY_TIMEOUT);
+  if(result != 1)
+    return; // No packets received, so we have nothing to do.
 
   result = SDLNet_UDP_Recv(ipxServerSocket, &inPacket);
   if (result != 0) {
@@ -206,12 +213,25 @@ void IPX_StopServer() {
 
 bool IPX_StartServer(Bit16u portnum) {
   Bit16u i;
+  int result;
 
   if(!SDLNet_ResolveHost(&ipxServerIp, NULL, portnum)) {
 	
     ipxServerSocket = SDLNet_UDP_Open(portnum);
     if(!ipxServerSocket) return false;
 
+    // Create a SocketSet, so that we can use SDLNet_CheckSockets() later.
+    ipxSocketSet = SDLNet_AllocSocketSet(1);
+    if(ipxSocketSet == NULL) {
+      LOG_MSG("IPXSERVER: Failed to allocate SocketSet.");
+      return false;
+    }
+    result = SDLNet_UDP_AddSocket(ipxSocketSet, ipxServerSocket);
+    if(result == -1) {
+      LOG_MSG("IPXSERVER: Failed to add ipxServerSocket to ipxSocketSet.");
+      return false;
+    }
+    
     for(i=0;i<SOCKETTABLESIZE;i++) connBuffer[i].connected = false;
     return true;
   }

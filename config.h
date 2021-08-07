@@ -51,8 +51,9 @@ int log_file(const char*, ...);
 
 // Application config
 #define PROGNAME "ipxnet"
-#define LOGNAME  "/home/intangir/log/ipxnet.log"
+#define LOGNAME  "/var/log/ipxnet"
 #define TICK_TIME 10000
+#define SOCKET_ACTIVITY_TIMEOUT 10000
 #define LOG_TO_FILE
 
 #ifdef LOG_TO_FILE
